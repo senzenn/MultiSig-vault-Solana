@@ -13,3 +13,8 @@
 [-] Security audit
 [-] Frontend dashboard
 [-] Deployment scripts
+
+
+## useful links
+Yield Farming Solana
+[[https://solanacompass.com/projects/category/defi/yield-staking]]
