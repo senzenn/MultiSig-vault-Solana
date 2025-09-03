@@ -65,6 +65,21 @@ graph TB
     style YF fill:#fff3e0
 ```
 
+
+
+## Project Structure
+
+```
+vault/
+├── Cargo.toml          # Dependencies and build configuration
+├── src/
+│   ├── lib.rs          # Program entry point and module declarations
+│   ├── state.rs        # Account state structures
+│   ├── instruction.rs  # Instruction definitions
+│   ├── processor.rs    # Main instruction processing logic
+│   └── events.rs       # Event definitions
+```
+
 ## ✨ Advanced Features
 
 ### 🔐 **Multi-Signature Security**
@@ -116,3 +131,7 @@ graph TB
 - **Performance Optimized**: Efficient event emission without gas overhead
 
 ## 🏗️ Enhanced Program Structure
+
+
+
+
