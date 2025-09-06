@@ -1,0 +1,28 @@
+# Rust build artifacts
+target/
+Cargo.lock
+
+# Environment files
+.env
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Keypair files (contains private keys)
+*.json
+!Cargo.toml
+!README.md
+
+# Log files
+*.log
+
+# Temporary files
+*.tmp
+*.bak
