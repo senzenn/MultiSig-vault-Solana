@@ -29,8 +29,74 @@ pub struct WithdrawEvent {
 #[derive(BorshSerialize, BorshDeserialize, Debug, serde::Serialize)]
 pub struct MultiSigInitializedEvent {
     pub base: VaultEvent,
-    pub authorities: Vec<Pubkey>,
-    pub threshold: u8,
+    pub owners: Vec<Pubkey>,
+    pub threshold: u64,
+    pub nonce: u8,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, serde::Serialize)]
+pub struct MultiSigTransactionCreatedEvent {
+    pub base: VaultEvent,
+    pub transaction_id: u64,
+    pub proposer: Pubkey,
+    pub target_program: Pubkey,
+    pub instruction_count: usize,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, serde::Serialize)]
+pub struct MultiSigTransactionApprovedEvent {
+    pub base: VaultEvent,
+    pub transaction_id: u64,
+    pub approver: Pubkey,
+    pub current_approvals: usize,
+    pub required_approvals: usize,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, serde::Serialize)]
+pub struct MultiSigTransactionExecutedEvent {
+    pub base: VaultEvent,
+    pub transaction_id: u64,
+    pub executor: Pubkey,
+    pub target_program: Pubkey,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, serde::Serialize)]
+pub struct MultiSigOwnersUpdatedEvent {
+    pub base: VaultEvent,
+    pub old_owners: Vec<Pubkey>,
+    pub new_owners: Vec<Pubkey>,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, serde::Serialize)]
+pub struct MultiSigThresholdUpdatedEvent {
+    pub base: VaultEvent,
+    pub old_threshold: u64,
+    pub new_threshold: u64,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, serde::Serialize)]
+pub struct VaultInitializedEvent {
+    pub base: VaultEvent,
+    pub bump: u8,
+    pub emergency_admin: Pubkey,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, serde::Serialize)]
+pub struct TokenDepositedEvent {
+    pub base: VaultEvent,
+    pub token_mint: Pubkey,
+    pub amount: u64,
+    pub fee_amount: u64,
+    pub depositor: Pubkey,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, serde::Serialize)]
+pub struct TokenWithdrawnEvent {
+    pub base: VaultEvent,
+    pub token_mint: Pubkey,
+    pub amount: u64,
+    pub fee_amount: u64,
+    pub recipient: Pubkey,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, serde::Serialize)]
@@ -76,6 +142,7 @@ pub struct EmergencyWithdrawEvent {
 pub struct TokenAddedEvent {
     pub base: VaultEvent,
     pub token_mint: Pubkey,
+    pub vault_token_account: Pubkey,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Debug, serde::Serialize)]

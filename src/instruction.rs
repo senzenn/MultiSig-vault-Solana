@@ -1,8 +1,13 @@
+use solana_program::pubkey::Pubkey;
+use borsh::{BorshDeserialize, BorshSerialize};
+use crate::state::{GovernanceInstruction, VoteType};
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, Clone)]
 pub enum VaultInstruction {
-// why  we need this->  every transaction to your program will specify which variant to execute
-// sol -> serialze instructions -> then send it to your program
+    // why we need this-> every transaction to your program will specify which variant to execute
+    // sol -> serialze instructions -> then send it to your program
     Initialize {
-        bump: u8, // initial vault creates  PDA
+        bump: u8, // initial vault creates PDA
     },
     Deposite {
         amount: u64, // V
@@ -10,11 +15,33 @@ pub enum VaultInstruction {
     Withdraw {
         amount: u64, // V and Security
     },
+    Transfer {
+        recipient: Pubkey,
+        amount: u64, // Transfer SOL directly to another account
+    },
     InitializeMultiSig { // multi sig
-        authorities: Vec<Pubkey>,
-        threshold: u8, // min sig
-        bump: u8, // pda creation
+        owners: Vec<Pubkey>,
+        threshold: u64, // min sig
+        nonce: u8, // for PDA derivation
     }, // it is required for creating 3-5 signature for large withdrawals
+
+    CreateMultiSigTransaction { // Create a new multisig transaction
+        program_id: Pubkey,
+        accounts: Vec<crate::state::TransactionAccount>,
+        data: Vec<u8>,
+    },
+    ApproveMultiSigTransaction {
+        transaction_id: u64,
+    },
+    ExecuteMultiSigTransaction {
+        transaction_id: u64,
+    },
+    SetMultiSigOwners {
+        owners: Vec<Pubkey>,
+    },
+    ChangeMultiSigThreshold {
+        threshold: u64,
+    },
 
     CreateProposal { // it Approves a Pending transaction for execution
         instruction: Box<VaultInstruction>,
@@ -25,93 +52,89 @@ pub enum VaultInstruction {
     ExecuteProposal {
         proposal_id: u64,
     },
-    RejectProposal { // halt exectiution of alll programs
+    RejectProposal {
         proposal_id: u64,
     },
-    PauseVault,// temporary stop all transactions
-    unPauseVault,  // toggle pause
-    EmergencyWithdraw {  // allow admin  withdraw as a emergency
+
+    PauseVault, // emergency pause
+    UnpauseVault, // resume operations
+    EmergencyWithdraw {
         token_mint: Pubkey,
         amount: u64,
-    }, // only admin can do this
-    AddSupportedToken { // add new token to the vault
+    },
+    AddSupportedToken {
         mint: Pubkey,
         bump: u8,
     },
-    DepositeMultiToken {  // non-SOL token
+    DepositMultiToken {
         mint: Pubkey,
         amount: u64,
     },
-    CreateTimeLock { // kind of like stream flow
+    CreateTimeLock {
         beneficiary: Pubkey,
         amount: u64,
         duration: i64,
         cliff_duration: Option<i64>,
-        is_linear: bool, // whether to release token linearly or not
+        is_linear: bool,
     },
     ClaimTimeLock {
-        time_lock_index: usize, // my token gets unlocked
+        time_lock_index: usize,
     },
     CancelTimeLock {
-        time_lock_index: usize, // admin can cancel the stream flow before claim date
+        time_lock_index: usize,
     },
-
     SetYieldStrategy {
-        token_mint: Pubkey, // token to farm
-        strategy_program: Pubkey, // Defi protocol to use
+        token_mint: Pubkey,
+        strategy_program: Pubkey,
     },
-
     HarvestYield {
-        token_mint: Pubkey, // collect yeiild
-    },
-    CompoundYield { // automate reinvestment of yield
         token_mint: Pubkey,
     },
-
-    // Dex integration
-    JupiterSwap {
-        input_mint: Pubkey, // swap token from Sol
-        output_mint: Pubkey, // swap token to ETH
-        amount: u64, // amount to swap
+    CompoundYield {
+        token_mint: Pubkey,
     },
-// TODO: Dex integration
-    JupiterRoute { // Execute a complex swap across multiple DEXs
+    JupiterSwap {
         input_mint: Pubkey,
         output_mint: Pubkey,
         amount: u64,
-        route: Vec<u8>, // encoded swap route
     },
-    CollectFees,// collect fee which is collected by the vault
-    TransferAuthority { // changing vault ownership
+
+    JupiterRoute {
+        input_mint: Pubkey,
+        output_mint: Pubkey,
+        amount: u64,
+        route: Vec<u8>,
+    },
+    CollectFees,
+    TransferAuthority {
         new_authority: Pubkey,
     },
     UpdateEmergencyAdmin {
         new_admin: Pubkey,
     },
-    InitializeGovernance { // setup decentralized governance
-        voting_token_mint: Pubkey, // token used for voting
+    InitializeGovernance {
+        voting_token_mint: Pubkey,
         quorm_threshold: u16,
         proposal_threshold: u64,
         voting_period: i64,
         time_lock_delay: i64,
         execution_threshold: u16,
     },
-    CreateGovernanceProposal { // create a new proposal
-        title: String, // proposal title
+    CreateGovernanceProposal {
+        title: String,
         description: String,
-        instructions: Vec<GovernanceInstruction>, // action to execute if passed
+        instructions: Vec<Vec<u8>>,
     },
-    CasteVote {
-        proposal_id: u64, // which proposal to vote on
-        vote_type: VoteType, // For / Against/ Abstain
+    CastVote {
+        proposal_id: u64,
+        vote_type: crate::state::VoteType,
     },
     QueueProposal {
-        proposal_id: u64, 
+        proposal_id: u64,
     },
     ExecuteGovernanceProposal {
         proposal_id: u64,
     },
-
     UpdateGovernanceConfig {
         quorm_threshold: u16,
         proposal_threshold: u64,
@@ -119,4 +142,10 @@ pub enum VaultInstruction {
         time_lock_delay: i64,
         execution_threshold: u16,
     },
+}
+
+impl Default for VaultInstruction {
+    fn default() -> Self {
+        VaultInstruction::Initialize { bump: 0 }
+    }
 }
