@@ -10,6 +10,7 @@ use solana_program::{
     rent::Rent,
     sysvar::Sysvar,
     system_instruction,
+    system_program,
     program_pack::Pack,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
@@ -42,6 +43,10 @@ pub fn process_instruction(
         VaultInstruction::Withdraw { amount } => {
             msg!("Instruction: Withdraw tokens");
             process_withdraw(program_id, accounts, amount)
+        }
+        VaultInstruction::WithdrawSOL { amount } => {
+            msg!("Instruction: Withdraw SOL");
+            process_withdraw_sol(program_id, accounts, amount)
         }
         VaultInstruction::Transfer { recipient, amount } => {
             msg!("Instruction: Transfer tokens to {}", recipient);
@@ -665,23 +670,208 @@ fn process_withdraw(program_id: &Pubkey, accounts: &[AccountInfo], amount: u64) 
     Ok(())
 }
 
+fn process_withdraw_sol(program_id: &Pubkey, accounts: &[AccountInfo], amount: u64) -> ProgramResult {
+    let account_info_iter = &mut accounts.iter();
+    let vault_account = next_account_info(account_info_iter)?;
+    let recipient = next_account_info(account_info_iter)?;
+    let system_program = next_account_info(account_info_iter)?;
+    let clock_sysvar = next_account_info(account_info_iter)?;
+
+    // Validate accounts
+    if vault_account.owner != program_id {
+        return Err(VaultError::InvalidAccountOwner.into());
+    }
+
+    if *system_program.key != system_program::ID {
+        return Err(VaultError::InvalidAccountData.into());
+    }
+
+    // Load vault state
+    let vault_data = vault_account.data.borrow();
+    let mut vault = Vault::try_from_slice(&vault_data)?;
+
+    // Check if vault is paused
+    if vault.paused {
+        return Err(VaultError::UnauthorizedAccess.into());
+    }
+
+    // Check vault SOL balance
+    let vault_balance = vault_account.lamports();
+    if vault_balance < amount {
+        return Err(VaultError::InvalidAmount.into());
+    }
+
+    // Calculate fees
+    let withdrawal_fee = if amount > 0 {
+        (amount as u128 * vault.fee_config.withdrawal_fee_bps as u128 / 10000) as u64
+    } else {
+        0
+    };
+    let net_withdrawal_amount = amount - withdrawal_fee;
+
+    // Perform SOL transfer from vault to recipient
+    let transfer_ix = system_instruction::transfer(
+        vault_account.key,
+        recipient.key,
+        net_withdrawal_amount,
+    );
+
+    // Use invoke_signed since vault is a PDA
+    let vault_seeds = &[b"vault", vault.authority.as_ref(), &[vault.bump]];
+    invoke_signed(
+        &transfer_ix,
+        &[
+            vault_account.clone(),
+            recipient.clone(),
+            system_program.clone(),
+        ],
+        &[vault_seeds],
+    )?;
+
+    // Update vault state
+    let clock = Clock::from_account_info(clock_sysvar)?;
+
+    // Update total value locked and fees
+    vault.total_value_locked -= net_withdrawal_amount;
+    vault.total_fees_collected += withdrawal_fee;
+
+    // Serialize updated vault state
+    drop(vault_data);
+    vault.serialize(&mut &mut vault_account.data.borrow_mut()[..])?;
+
+    // Emit withdrawal event
+    let withdrawal_event = TokenWithdrawnEvent {
+        base: create_base_event(
+            *vault_account.key,
+            *recipient.key,
+            "sol_withdrawn",
+            &clock,
+        ),
+        token_mint: spl_token::native_mint::id(), // Use native SOL mint
+        amount: net_withdrawal_amount,
+        fee_amount: withdrawal_fee,
+        recipient: *recipient.key,
+    };
+    emit_event!(withdrawal_event, withdrawal_event);
+
+    msg!(
+        "Successfully withdrew {} SOL (fee: {}) from vault",
+        net_withdrawal_amount,
+        withdrawal_fee
+    );
+    msg!("Recipient: {}", recipient.key);
+
+    Ok(())
+}
+
 fn process_transfer(
     program_id: &Pubkey,
     accounts: &[AccountInfo],
     recipient: Pubkey,
     amount: u64,
 ) -> ProgramResult {
+    let account_info_iter = &mut accounts.iter();
+    let vault_account = next_account_info(account_info_iter)?;
+    let recipient_account = next_account_info(account_info_iter)?;
+    let authority = next_account_info(account_info_iter)?;
+    let system_program = next_account_info(account_info_iter)?;
+    let clock_sysvar = next_account_info(account_info_iter)?;
+
+    // Validate accounts
+    if !authority.is_signer {
+        return Err(ProgramError::MissingRequiredSignature);
+    }
+
+    if vault_account.owner != program_id {
+        return Err(VaultError::InvalidAccountOwner.into());
+    }
+
+    if *system_program.key != system_program::ID {
+        return Err(VaultError::InvalidAccountData.into());
+    }
+
+    // Load vault state
+    let vault_data = vault_account.data.borrow();
+    let mut vault = Vault::try_from_slice(&vault_data)?;
+
+    // Check if vault is paused
+    if vault.paused {
+        return Err(VaultError::UnauthorizedAccess.into());
+    }
+
+    // Verify authority
+    if vault.authority != *authority.key {
+        return Err(VaultError::InsufficientAuthority.into());
+    }
+
+    // Check vault SOL balance
+    let vault_balance = vault_account.lamports();
+    if vault_balance < amount {
+        return Err(VaultError::InvalidAmount.into());
+    }
+
+    // Calculate fees
+    let transfer_fee = if amount > 0 {
+        (amount as u128 * vault.fee_config.withdrawal_fee_bps as u128 / 10000) as u64
+    } else {
+        0
+    };
+    let net_transfer_amount = amount - transfer_fee;
+
+    // Perform SOL transfer from vault to recipient
+    let transfer_ix = system_instruction::transfer(
+        vault_account.key,
+        recipient_account.key,
+        net_transfer_amount,
+    );
+
+    // Use invoke_signed since vault is a PDA
+    let vault_seeds = &[b"vault", vault.authority.as_ref(), &[vault.bump]];
+    invoke_signed(
+        &transfer_ix,
+        &[
+            vault_account.clone(),
+            recipient_account.clone(),
+            system_program.clone(),
+        ],
+        &[vault_seeds],
+    )?;
+
+    // Update vault state
+    let clock = Clock::from_account_info(clock_sysvar)?;
+
+    // Update total value locked and fees
+    vault.total_value_locked -= net_transfer_amount;
+    vault.total_fees_collected += transfer_fee;
+
+    // Serialize updated vault state
+    drop(vault_data);
+    vault.serialize(&mut &mut vault_account.data.borrow_mut()[..])?;
+
+    // Emit transfer event
+    let transfer_event = TokenWithdrawnEvent {
+        base: create_base_event(
+            *vault_account.key,
+            *authority.key,
+            "sol_transferred",
+            &clock,
+        ),
+        token_mint: spl_token::native_mint::id(), // Use native SOL mint
+        amount: net_transfer_amount,
+        fee_amount: transfer_fee,
+        recipient: *recipient_account.key,
+    };
+    emit_event!(transfer_event, transfer_event);
+
     msg!(
-        "Processing transfer of {} lamports to {}",
-        amount,
+        "Successfully transferred {} SOL (fee: {}) from vault to {}",
+        net_transfer_amount,
+        transfer_fee,
         recipient
     );
-    // TODO: Implement actual transfer logic
-    // This would involve:
-    // 1. Verify authority
-    // 2. Check vault balance
-    // 3. Transfer SOL from vault to recipient
-    // 4. Update vault state
+    msg!("Authority: {}", authority.key);
+    msg!("Recipient: {}", recipient_account.key);
+
     Ok(())
 }
 
@@ -1591,3 +1781,4 @@ fn update_supported_token_totals(
         supported_token.total_withdrawn += withdrawn;
     }
 }
+

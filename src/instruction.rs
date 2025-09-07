@@ -15,6 +15,9 @@ pub enum VaultInstruction {
     Withdraw {
         amount: u64, // V and Security
     },
+    WithdrawSOL {
+        amount: u64, // Withdraw SOL directly from vault
+    },
     Transfer {
         recipient: Pubkey,
         amount: u64, // Transfer SOL directly to another account

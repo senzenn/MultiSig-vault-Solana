@@ -250,3 +250,11 @@ pub fn create_base_event(
         authority,
     }
 }
+
+#[derive(BorshSerialize, BorshDeserialize, Debug, serde::Serialize)]
+pub struct TransferEvent {
+    pub from: Pubkey,
+    pub to: Pubkey,
+    pub amount: u64,
+    pub timestamp: i64,
+}

@@ -2,7 +2,7 @@ use solana_program::{entrypoint, program_error::ProgramError};
 
 // Program ID - this should match your actual program ID
 use solana_program::declare_id;
-declare_id!("11111111111111111111111111111112");
+declare_id!("DvMJg65xGz7W7xa1tP6LW2RP4TecJDb5oN2Qcvf7Qc63");
 
 // Export the program ID for use in tests and other modules
 pub use crate::ID as PROGRAM_ID;
