@@ -57,7 +57,9 @@ mod tests {
                 AccountMeta::new_readonly(solana_program::sysvar::rent::id(), false),
                 AccountMeta::new_readonly(solana_sdk::sysvar::clock::id(), false),
             ],
-            data: VaultInstruction::Initialize { bump: 0 }.try_to_vec().unwrap(),
+            data: VaultInstruction::Initialize { bump: 0 }
+                .try_to_vec()
+                .unwrap(),
         };
 
         let transaction = Transaction::new_signed_with_payer(
@@ -96,7 +98,9 @@ mod tests {
                 owners: owners.clone(),
                 threshold,
                 nonce,
-            }.try_to_vec().unwrap(),
+            }
+            .try_to_vec()
+            .unwrap(),
         };
 
         let transaction = Transaction::new_signed_with_payer(
@@ -109,7 +113,11 @@ mod tests {
         banks_client.process_transaction(transaction).await.unwrap();
 
         // Verify multisig was created
-        let vault_account = banks_client.get_account(vault_pubkey).await.unwrap().unwrap();
+        let vault_account = banks_client
+            .get_account(vault_pubkey)
+            .await
+            .unwrap()
+            .unwrap();
         let vault: Vault = Vault::try_from_slice(&vault_account.data).unwrap();
 
         assert!(vault.multi_sig.is_some());
@@ -138,7 +146,9 @@ mod tests {
                 owners: owners.clone(),
                 threshold: 0, // Invalid threshold
                 nonce: 0,
-            }.try_to_vec().unwrap(),
+            }
+            .try_to_vec()
+            .unwrap(),
         };
 
         let transaction = Transaction::new_signed_with_payer(
@@ -175,7 +185,9 @@ mod tests {
                 owners: owners.clone(),
                 threshold,
                 nonce: 0,
-            }.try_to_vec().unwrap(),
+            }
+            .try_to_vec()
+            .unwrap(),
         };
 
         let transaction = Transaction::new_signed_with_payer(
@@ -221,7 +233,9 @@ mod tests {
                 program_id: system_program::id(),
                 accounts: transaction_accounts,
                 data: transfer_ix.data,
-            }.try_to_vec().unwrap(),
+            }
+            .try_to_vec()
+            .unwrap(),
         };
 
         let transaction = Transaction::new_signed_with_payer(
@@ -234,7 +248,11 @@ mod tests {
         banks_client.process_transaction(transaction).await.unwrap();
 
         // Verify transaction was created
-        let vault_account = banks_client.get_account(vault_pubkey).await.unwrap().unwrap();
+        let vault_account = banks_client
+            .get_account(vault_pubkey)
+            .await
+            .unwrap()
+            .unwrap();
         let vault: Vault = Vault::try_from_slice(&vault_account.data).unwrap();
 
         assert_eq!(vault.multi_sig_transactions.len(), 1);
@@ -271,15 +289,20 @@ mod tests {
                 owners: owners.clone(),
                 threshold,
                 nonce: 0,
-            }.try_to_vec().unwrap(),
+            }
+            .try_to_vec()
+            .unwrap(),
         };
 
-        banks_client.process_transaction(Transaction::new_signed_with_payer(
-            &[initialize_multisig_ix],
-            Some(&payer.pubkey()),
-            &[&payer],
-            recent_blockhash,
-        )).await.unwrap();
+        banks_client
+            .process_transaction(Transaction::new_signed_with_payer(
+                &[initialize_multisig_ix],
+                Some(&payer.pubkey()),
+                &[&payer],
+                recent_blockhash,
+            ))
+            .await
+            .unwrap();
 
         // Create transaction
         let recipient = Keypair::new();
@@ -313,15 +336,20 @@ mod tests {
                 program_id: system_program::id(),
                 accounts: transaction_accounts,
                 data: transfer_ix.data,
-            }.try_to_vec().unwrap(),
+            }
+            .try_to_vec()
+            .unwrap(),
         };
 
-        banks_client.process_transaction(Transaction::new_signed_with_payer(
-            &[create_transaction_ix],
-            Some(&payer.pubkey()),
-            &[&payer],
-            recent_blockhash,
-        )).await.unwrap();
+        banks_client
+            .process_transaction(Transaction::new_signed_with_payer(
+                &[create_transaction_ix],
+                Some(&payer.pubkey()),
+                &[&payer],
+                recent_blockhash,
+            ))
+            .await
+            .unwrap();
 
         // Approve transaction with owner1
         let approve_ix = Instruction {
@@ -331,20 +359,27 @@ mod tests {
                 AccountMeta::new_readonly(owner1.pubkey(), true),
                 AccountMeta::new_readonly(solana_sdk::sysvar::clock::id(), false),
             ],
-            data: VaultInstruction::ApproveMultiSigTransaction {
-                transaction_id: 0,
-            }.try_to_vec().unwrap(),
+            data: VaultInstruction::ApproveMultiSigTransaction { transaction_id: 0 }
+                .try_to_vec()
+                .unwrap(),
         };
 
-        banks_client.process_transaction(Transaction::new_signed_with_payer(
-            &[approve_ix],
-            Some(&payer.pubkey()),
-            &[&payer, &owner1],
-            recent_blockhash,
-        )).await.unwrap();
+        banks_client
+            .process_transaction(Transaction::new_signed_with_payer(
+                &[approve_ix],
+                Some(&payer.pubkey()),
+                &[&payer, &owner1],
+                recent_blockhash,
+            ))
+            .await
+            .unwrap();
 
         // Verify approval
-        let vault_account = banks_client.get_account(vault_pubkey).await.unwrap().unwrap();
+        let vault_account = banks_client
+            .get_account(vault_pubkey)
+            .await
+            .unwrap()
+            .unwrap();
         let vault: Vault = Vault::try_from_slice(&vault_account.data).unwrap();
 
         let tx = &vault.multi_sig_transactions[0];
@@ -367,12 +402,15 @@ mod tests {
             fund_amount,
         );
 
-        banks_client.process_transaction(Transaction::new_signed_with_payer(
-            &[fund_ix],
-            Some(&payer.pubkey()),
-            &[&payer],
-            recent_blockhash,
-        )).await.unwrap();
+        banks_client
+            .process_transaction(Transaction::new_signed_with_payer(
+                &[fund_ix],
+                Some(&payer.pubkey()),
+                &[&payer],
+                recent_blockhash,
+            ))
+            .await
+            .unwrap();
 
         // Initialize multisig
         let owner1 = Keypair::new();
@@ -391,15 +429,20 @@ mod tests {
                 owners: owners.clone(),
                 threshold,
                 nonce: 0,
-            }.try_to_vec().unwrap(),
+            }
+            .try_to_vec()
+            .unwrap(),
         };
 
-        banks_client.process_transaction(Transaction::new_signed_with_payer(
-            &[initialize_multisig_ix],
-            Some(&payer.pubkey()),
-            &[&payer],
-            recent_blockhash,
-        )).await.unwrap();
+        banks_client
+            .process_transaction(Transaction::new_signed_with_payer(
+                &[initialize_multisig_ix],
+                Some(&payer.pubkey()),
+                &[&payer],
+                recent_blockhash,
+            ))
+            .await
+            .unwrap();
 
         // Create transaction
         let recipient = Keypair::new();
@@ -440,15 +483,20 @@ mod tests {
                 program_id: system_program::id(),
                 accounts: transaction_accounts,
                 data: transfer_ix.data,
-            }.try_to_vec().unwrap(),
+            }
+            .try_to_vec()
+            .unwrap(),
         };
 
-        banks_client.process_transaction(Transaction::new_signed_with_payer(
-            &[create_transaction_ix],
-            Some(&payer.pubkey()),
-            &[&payer],
-            recent_blockhash,
-        )).await.unwrap();
+        banks_client
+            .process_transaction(Transaction::new_signed_with_payer(
+                &[create_transaction_ix],
+                Some(&payer.pubkey()),
+                &[&payer],
+                recent_blockhash,
+            ))
+            .await
+            .unwrap();
 
         // Approve with owner1
         let approve_ix = Instruction {
@@ -458,23 +506,24 @@ mod tests {
                 AccountMeta::new_readonly(owner1.pubkey(), true),
                 AccountMeta::new_readonly(solana_sdk::sysvar::clock::id(), false),
             ],
-            data: VaultInstruction::ApproveMultiSigTransaction {
-                transaction_id: 0,
-            }.try_to_vec().unwrap(),
+            data: VaultInstruction::ApproveMultiSigTransaction { transaction_id: 0 }
+                .try_to_vec()
+                .unwrap(),
         };
 
-        banks_client.process_transaction(Transaction::new_signed_with_payer(
-            &[approve_ix],
-            Some(&payer.pubkey()),
-            &[&payer, &owner1],
-            recent_blockhash,
-        )).await.unwrap();
+        banks_client
+            .process_transaction(Transaction::new_signed_with_payer(
+                &[approve_ix],
+                Some(&payer.pubkey()),
+                &[&payer, &owner1],
+                recent_blockhash,
+            ))
+            .await
+            .unwrap();
 
         // Derive multisig signer PDA
-        let (multisig_signer, _) = Pubkey::find_program_address(
-            &[vault_pubkey.as_ref(), &[0]],
-            &PROGRAM_ID,
-        );
+        let (multisig_signer, _) =
+            Pubkey::find_program_address(&[vault_pubkey.as_ref(), &[0]], &PROGRAM_ID);
 
         // Execute transaction
         let execute_ix = Instruction {
@@ -489,27 +538,38 @@ mod tests {
                 AccountMeta::new(recipient.pubkey(), false),
                 AccountMeta::new_readonly(system_program::id(), false),
             ],
-            data: VaultInstruction::ExecuteMultiSigTransaction {
-                transaction_id: 0,
-            }.try_to_vec().unwrap(),
+            data: VaultInstruction::ExecuteMultiSigTransaction { transaction_id: 0 }
+                .try_to_vec()
+                .unwrap(),
         };
 
-        banks_client.process_transaction(Transaction::new_signed_with_payer(
-            &[execute_ix],
-            Some(&payer.pubkey()),
-            &[&payer],
-            recent_blockhash,
-        )).await.unwrap();
+        banks_client
+            .process_transaction(Transaction::new_signed_with_payer(
+                &[execute_ix],
+                Some(&payer.pubkey()),
+                &[&payer],
+                recent_blockhash,
+            ))
+            .await
+            .unwrap();
 
         // Verify transaction was executed
-        let vault_account = banks_client.get_account(vault_pubkey).await.unwrap().unwrap();
+        let vault_account = banks_client
+            .get_account(vault_pubkey)
+            .await
+            .unwrap()
+            .unwrap();
         let vault: Vault = Vault::try_from_slice(&vault_account.data).unwrap();
 
         let tx = &vault.multi_sig_transactions[0];
         assert!(tx.did_execute);
 
         // Verify transfer occurred
-        let recipient_account = banks_client.get_account(recipient.pubkey()).await.unwrap().unwrap();
+        let recipient_account = banks_client
+            .get_account(recipient.pubkey())
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(recipient_account.lamports, transfer_amount);
     }
 
@@ -524,7 +584,13 @@ mod tests {
         let owner2 = Keypair::new();
         let owner3 = Keypair::new();
         let owner4 = Keypair::new();
-        let owners = vec![payer.pubkey(), owner1.pubkey(), owner2.pubkey(), owner3.pubkey(), owner4.pubkey()];
+        let owners = vec![
+            payer.pubkey(),
+            owner1.pubkey(),
+            owner2.pubkey(),
+            owner3.pubkey(),
+            owner4.pubkey(),
+        ];
         let threshold = 3u64;
 
         let initialize_multisig_ix = Instruction {
@@ -538,15 +604,20 @@ mod tests {
                 owners: owners.clone(),
                 threshold,
                 nonce: 0,
-            }.try_to_vec().unwrap(),
+            }
+            .try_to_vec()
+            .unwrap(),
         };
 
-        banks_client.process_transaction(Transaction::new_signed_with_payer(
-            &[initialize_multisig_ix],
-            Some(&payer.pubkey()),
-            &[&payer],
-            recent_blockhash,
-        )).await.unwrap();
+        banks_client
+            .process_transaction(Transaction::new_signed_with_payer(
+                &[initialize_multisig_ix],
+                Some(&payer.pubkey()),
+                &[&payer],
+                recent_blockhash,
+            ))
+            .await
+            .unwrap();
 
         // Create transaction
         let recipient = Keypair::new();
@@ -580,15 +651,20 @@ mod tests {
                 program_id: system_program::id(),
                 accounts: transaction_accounts,
                 data: transfer_ix.data,
-            }.try_to_vec().unwrap(),
+            }
+            .try_to_vec()
+            .unwrap(),
         };
 
-        banks_client.process_transaction(Transaction::new_signed_with_payer(
-            &[create_transaction_ix],
-            Some(&payer.pubkey()),
-            &[&payer],
-            recent_blockhash,
-        )).await.unwrap();
+        banks_client
+            .process_transaction(Transaction::new_signed_with_payer(
+                &[create_transaction_ix],
+                Some(&payer.pubkey()),
+                &[&payer],
+                recent_blockhash,
+            ))
+            .await
+            .unwrap();
 
         // Approve with only 1 additional owner (total 2 approvals, but need 3)
         let approve_ix = Instruction {
@@ -598,23 +674,24 @@ mod tests {
                 AccountMeta::new_readonly(owner1.pubkey(), true),
                 AccountMeta::new_readonly(solana_sdk::sysvar::clock::id(), false),
             ],
-            data: VaultInstruction::ApproveMultiSigTransaction {
-                transaction_id: 0,
-            }.try_to_vec().unwrap(),
+            data: VaultInstruction::ApproveMultiSigTransaction { transaction_id: 0 }
+                .try_to_vec()
+                .unwrap(),
         };
 
-        banks_client.process_transaction(Transaction::new_signed_with_payer(
-            &[approve_ix],
-            Some(&payer.pubkey()),
-            &[&payer, &owner1],
-            recent_blockhash,
-        )).await.unwrap();
+        banks_client
+            .process_transaction(Transaction::new_signed_with_payer(
+                &[approve_ix],
+                Some(&payer.pubkey()),
+                &[&payer, &owner1],
+                recent_blockhash,
+            ))
+            .await
+            .unwrap();
 
         // Try to execute with only 2 approvals (should fail)
-        let (multisig_signer, _) = Pubkey::find_program_address(
-            &[vault_pubkey.as_ref(), &[0]],
-            &PROGRAM_ID,
-        );
+        let (multisig_signer, _) =
+            Pubkey::find_program_address(&[vault_pubkey.as_ref(), &[0]], &PROGRAM_ID);
 
         let execute_ix = Instruction {
             program_id: PROGRAM_ID,
@@ -624,21 +701,30 @@ mod tests {
                 AccountMeta::new_readonly(payer.pubkey(), true),
                 AccountMeta::new_readonly(solana_sdk::sysvar::clock::id(), false),
             ],
-            data: VaultInstruction::ExecuteMultiSigTransaction {
-                transaction_id: 0,
-            }.try_to_vec().unwrap(),
+            data: VaultInstruction::ExecuteMultiSigTransaction { transaction_id: 0 }
+                .try_to_vec()
+                .unwrap(),
         };
 
         // Should fail due to insufficient approvals
-        assert!(banks_client.process_transaction(Transaction::new_signed_with_payer(
-            &[execute_ix],
-            Some(&payer.pubkey()),
-            &[&payer],
-            recent_blockhash,
-        )).await.is_err());
+        assert!(
+            banks_client
+                .process_transaction(Transaction::new_signed_with_payer(
+                    &[execute_ix],
+                    Some(&payer.pubkey()),
+                    &[&payer],
+                    recent_blockhash,
+                ))
+                .await
+                .is_err()
+        );
 
         // Verify transaction was not executed
-        let vault_account = banks_client.get_account(vault_pubkey).await.unwrap().unwrap();
+        let vault_account = banks_client
+            .get_account(vault_pubkey)
+            .await
+            .unwrap()
+            .unwrap();
         let vault: Vault = Vault::try_from_slice(&vault_account.data).unwrap();
 
         let tx = &vault.multi_sig_transactions[0];

@@ -19,13 +19,15 @@ pub enum VaultInstruction {
         recipient: Pubkey,
         amount: u64, // Transfer SOL directly to another account
     },
-    InitializeMultiSig { // multi sig
+    InitializeMultiSig {
+        // multi sig
         owners: Vec<Pubkey>,
         threshold: u64, // min sig
-        nonce: u8, // for PDA derivation
+        nonce: u8,      // for PDA derivation
     }, // it is required for creating 3-5 signature for large withdrawals
 
-    CreateMultiSigTransaction { // Create a new multisig transaction
+    CreateMultiSigTransaction {
+        // Create a new multisig transaction
         program_id: Pubkey,
         accounts: Vec<crate::state::TransactionAccount>,
         data: Vec<u8>,
@@ -43,8 +45,9 @@ pub enum VaultInstruction {
         threshold: u64,
     },
 
-    CreateProposal { // it Approves a Pending transaction for execution
-        instruction: Box<VaultInstruction>,
+    CreateProposal {
+        // it Approves a Pending transaction for execution
+        instruction_data: Vec<u8>,
     },
     ApproveProposal {
         proposal_id: u64,
@@ -56,7 +59,7 @@ pub enum VaultInstruction {
         proposal_id: u64,
     },
 
-    PauseVault, // emergency pause
+    PauseVault,   // emergency pause
     UnpauseVault, // resume operations
     EmergencyWithdraw {
         token_mint: Pubkey,
@@ -114,7 +117,7 @@ pub enum VaultInstruction {
     },
     InitializeGovernance {
         voting_token_mint: Pubkey,
-        quorm_threshold: u16,
+        quorum_threshold: u16,
         proposal_threshold: u64,
         voting_period: i64,
         time_lock_delay: i64,
@@ -136,7 +139,7 @@ pub enum VaultInstruction {
         proposal_id: u64,
     },
     UpdateGovernanceConfig {
-        quorm_threshold: u16,
+        quorum_threshold: u16,
         proposal_threshold: u64,
         voting_period: i64,
         time_lock_delay: i64,

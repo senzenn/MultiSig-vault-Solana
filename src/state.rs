@@ -4,7 +4,6 @@ use serde::Serialize;
 
 // Define VoteType enum
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Copy, PartialEq, Serialize)]
-#[borsh(use_discriminant = true)]
 pub enum VoteType {
     For = 0,
     Against = 1,
@@ -59,7 +58,7 @@ pub struct TimeLock {
 #[derive(BorshSerialize, BorshDeserialize, Debug, Clone, Default)]
 pub struct Proposal {
     pub id: u64,
-    pub instruction: crate::instruction::VaultInstruction,
+    pub instruction_data: Vec<u8>,
     pub approvals: Vec<Pubkey>,
     pub executed: bool,
     pub created_at: i64,

@@ -1,20 +1,18 @@
-use solana_program::{
-    entrypoint,
-    pubkey::Pubkey,
-    program_error::ProgramError,
-    msg,
-    decode_error::DecodeError,
-};
+use solana_program::{entrypoint, program_error::ProgramError};
 
 // Program ID - this should match your actual program ID
-pub const PROGRAM_ID: &str = "VaUltPr0gr4mID1234567890abcdefghij1234567890abcdef";
+use solana_program::declare_id;
+declare_id!("11111111111111111111111111111112");
+
+// Export the program ID for use in tests and other modules
+pub use crate::ID as PROGRAM_ID;
 
 pub mod instruction;
 pub mod defi;
 pub mod processor;
 pub mod state;
 pub mod events;
-pub mod vault_instructions;
+pub mod protocols;
 
 // Custom error codes for multisig operations
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -45,12 +43,25 @@ impl std::fmt::Display for VaultError {
         match self {
             VaultError::InvalidOwner => write!(f, "The given owner is not part of this multisig"),
             VaultError::NotEnoughSigners => write!(f, "Not enough owners signed this transaction"),
-            VaultError::TransactionAlreadyExecuted => write!(f, "The given transaction has already been executed"),
-            VaultError::TransactionAlreadySigned => write!(f, "The owner has already signed this transaction"),
-            VaultError::InvalidThreshold => write!(f, "Threshold must be less than or equal to the number of owners"),
-            VaultError::MultisigNotInitialized => write!(f, "Multisig has not been initialized for this vault"),
-            VaultError::TransactionNotFound => write!(f, "Transaction with the given ID was not found"),
-            VaultError::InsufficientAuthority => write!(f, "Insufficient authority to perform this operation"),
+            VaultError::TransactionAlreadyExecuted => {
+                write!(f, "The given transaction has already been executed")
+            }
+            VaultError::TransactionAlreadySigned => {
+                write!(f, "The owner has already signed this transaction")
+            }
+            VaultError::InvalidThreshold => write!(
+                f,
+                "Threshold must be less than or equal to the number of owners"
+            ),
+            VaultError::MultisigNotInitialized => {
+                write!(f, "Multisig has not been initialized for this vault")
+            }
+            VaultError::TransactionNotFound => {
+                write!(f, "Transaction with the given ID was not found")
+            }
+            VaultError::InsufficientAuthority => {
+                write!(f, "Insufficient authority to perform this operation")
+            }
             VaultError::InvalidTransactionData => write!(f, "Invalid transaction data provided"),
             VaultError::UnauthorizedAccess => write!(f, "Unauthorized access to this operation"),
             VaultError::InvalidInstruction => write!(f, "Invalid instruction data"),
@@ -60,12 +71,6 @@ impl std::fmt::Display for VaultError {
             VaultError::ArithmeticOverflow => write!(f, "Arithmetic operation overflow"),
             VaultError::InvalidAmount => write!(f, "Invalid amount specified"),
         }
-    }
-}
-
-impl<T> DecodeError<T> for VaultError {
-    fn type_of() -> &'static str {
-        "VaultError"
     }
 }
 
@@ -81,17 +86,20 @@ pub use defi::*;
 pub use processor::*;
 pub use state::*;
 pub use events::*;
-pub use vault_instructions::*;
+pub use protocols::*;
 
 // emit_event:-> think of it like pusher and logs it with msg macro simple :)
-#[macro_export]  // this is a way of saying like export emit_event  which means you can use this macro across the project files.
+#[macro_export] // this is a way of saying like export emit_event  which means you can use this macro across the project files.
 macro_rules! emit_event {
     ($event:ident, $data:expr) => {
-        msg!("EVENT: {}", serde_json::to_string(&$event).unwrap_or_else(|_| "Failed to serialize event".to_string()));
+        msg!(
+            "EVENT: {}",
+            serde_json::to_string(&$event)
+                .unwrap_or_else(|_| "Failed to serialize event".to_string())
+        );
     };
 }
 
 // Entry point
 #[cfg(not(feature = "no-entrypoint"))]
 entrypoint!(process_instruction);
-

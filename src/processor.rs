@@ -5,23 +5,16 @@ use solana_program::{
     program_error::ProgramError,
     pubkey::Pubkey,
     clock::Clock,
-    sysvar::Sysvar,
     program::{invoke_signed, invoke},
     instruction::{AccountMeta, Instruction},
-    system_instruction,
     rent::Rent,
-    system_program,
+    sysvar::Sysvar,
+    system_instruction,
+    program_pack::Pack,
 };
 use borsh::{BorshDeserialize, BorshSerialize};
-use spl_token::{
-    instruction as token_instruction,
-    state::Account as TokenAccount,
-};
-use solana_program::program_pack::Pack;
-use spl_associated_token_account::{
-    instruction as ata_instruction,
-    get_associated_token_address,
-};
+use spl_token::{instruction as token_instruction, state::Account as TokenAccount};
+use spl_associated_token_account::{instruction as ata_instruction, get_associated_token_address};
 
 use crate::instruction::VaultInstruction;
 use crate::state::{Vault, MultiSig, MultiSigTransaction, FeeConfig, SupportedToken, TokenBalance};
@@ -54,13 +47,27 @@ pub fn process_instruction(
             msg!("Instruction: Transfer tokens to {}", recipient);
             process_transfer(program_id, accounts, recipient, amount)
         }
-        VaultInstruction::InitializeMultiSig { owners, threshold, nonce } => {
+        VaultInstruction::InitializeMultiSig {
+            owners,
+            threshold,
+            nonce,
+        } => {
             msg!("Instruction: Initialize Multi-Signature Vault");
             process_initialize_multi_sig(program_id, accounts, owners, threshold, nonce)
         }
-        VaultInstruction::CreateMultiSigTransaction { program_id: target_program_id, accounts: transaction_accounts, data } => {
+        VaultInstruction::CreateMultiSigTransaction {
+            program_id: target_program_id,
+            accounts: transaction_accounts,
+            data,
+        } => {
             msg!("Instruction: Create Multi-Sig Transaction");
-            process_create_multi_sig_transaction(program_id, accounts, target_program_id, transaction_accounts, data)
+            process_create_multi_sig_transaction(
+                program_id,
+                accounts,
+                target_program_id,
+                transaction_accounts,
+                data,
+            )
         }
         VaultInstruction::ApproveMultiSigTransaction { transaction_id } => {
             msg!("Instruction: Approve Multi-Sig Transaction");
@@ -78,9 +85,9 @@ pub fn process_instruction(
             msg!("Instruction: Change Multi-Sig Threshold");
             process_change_multi_sig_threshold(program_id, accounts, threshold)
         }
-        VaultInstruction::CreateProposal { instruction } => {
+        VaultInstruction::CreateProposal { instruction_data } => {
             msg!("Instruction: Create Proposal");
-            process_create_proposal(program_id, accounts, *instruction)
+            process_create_proposal(program_id, accounts, instruction_data.clone())
         }
         VaultInstruction::ApproveProposal { proposal_id } => {
             msg!("Instruction: Approve Proposal");
@@ -114,9 +121,23 @@ pub fn process_instruction(
             msg!("Instruction: Deposit Multi Token");
             process_deposit_multi_token(program_id, accounts, mint, amount)
         }
-        VaultInstruction::CreateTimeLock { beneficiary, amount, duration, cliff_duration, is_linear } => {
+        VaultInstruction::CreateTimeLock {
+            beneficiary,
+            amount,
+            duration,
+            cliff_duration,
+            is_linear,
+        } => {
             msg!("Instruction: Create Time Lock");
-            process_create_time_lock(program_id, accounts, beneficiary, amount, duration, cliff_duration, is_linear)
+            process_create_time_lock(
+                program_id,
+                accounts,
+                beneficiary,
+                amount,
+                duration,
+                cliff_duration,
+                is_linear,
+            )
         }
         VaultInstruction::ClaimTimeLock { time_lock_index } => {
             msg!("Instruction: Claim Time Lock");
@@ -126,7 +147,10 @@ pub fn process_instruction(
             msg!("Instruction: Cancel Time Lock");
             process_cancel_time_lock(program_id, accounts, time_lock_index)
         }
-        VaultInstruction::SetYieldStrategy { token_mint, strategy_program } => {
+        VaultInstruction::SetYieldStrategy {
+            token_mint,
+            strategy_program,
+        } => {
             msg!("Instruction: Set Yield Strategy");
             process_set_yield_strategy(program_id, accounts, token_mint, strategy_program)
         }
@@ -138,11 +162,20 @@ pub fn process_instruction(
             msg!("Instruction: Compound Yield");
             process_compound_yield(program_id, accounts, token_mint)
         }
-        VaultInstruction::JupiterSwap { input_mint, output_mint, amount } => {
+        VaultInstruction::JupiterSwap {
+            input_mint,
+            output_mint,
+            amount,
+        } => {
             msg!("Instruction: Jupiter Swap");
             process_jupiter_swap(program_id, accounts, input_mint, output_mint, amount)
         }
-        VaultInstruction::JupiterRoute { input_mint, output_mint, amount, route } => {
+        VaultInstruction::JupiterRoute {
+            input_mint,
+            output_mint,
+            amount,
+            route,
+        } => {
             msg!("Instruction: Jupiter Route");
             process_jupiter_route(program_id, accounts, input_mint, output_mint, amount, route)
         }
@@ -158,15 +191,44 @@ pub fn process_instruction(
             msg!("Instruction: Update Emergency Admin");
             process_update_emergency_admin(program_id, accounts, new_admin)
         }
-        VaultInstruction::InitializeGovernance { voting_token_mint, quorm_threshold, proposal_threshold, voting_period, time_lock_delay, execution_threshold } => {
+        VaultInstruction::InitializeGovernance {
+            voting_token_mint,
+            quorum_threshold,
+            proposal_threshold,
+            voting_period,
+            time_lock_delay,
+            execution_threshold,
+        } => {
             msg!("Instruction: Initialize Governance");
-            process_initialize_governance(program_id, accounts, voting_token_mint, quorm_threshold, proposal_threshold, voting_period, time_lock_delay, execution_threshold)
+            process_initialize_governance(
+                program_id,
+                accounts,
+                voting_token_mint,
+                quorum_threshold,
+                proposal_threshold,
+                voting_period,
+                time_lock_delay,
+                execution_threshold,
+            )
         }
-        VaultInstruction::CreateGovernanceProposal { title, description, instructions } => {
+        VaultInstruction::CreateGovernanceProposal {
+            title,
+            description,
+            instructions,
+        } => {
             msg!("Instruction: Create Governance Proposal");
-            process_create_governance_proposal(program_id, accounts, title, description, instructions)
+            process_create_governance_proposal(
+                program_id,
+                accounts,
+                title,
+                description,
+                instructions,
+            )
         }
-        VaultInstruction::CastVote { proposal_id, vote_type } => {
+        VaultInstruction::CastVote {
+            proposal_id,
+            vote_type,
+        } => {
             msg!("Instruction: Cast Vote");
             process_cast_vote(program_id, accounts, proposal_id, vote_type)
         }
@@ -178,9 +240,23 @@ pub fn process_instruction(
             msg!("Instruction: Execute Governance Proposal");
             process_execute_governance_proposal(program_id, accounts, proposal_id)
         }
-        VaultInstruction::UpdateGovernanceConfig { quorm_threshold, proposal_threshold, voting_period, time_lock_delay, execution_threshold } => {
+        VaultInstruction::UpdateGovernanceConfig {
+            quorum_threshold,
+            proposal_threshold,
+            voting_period,
+            time_lock_delay,
+            execution_threshold,
+        } => {
             msg!("Instruction: Update Governance Config");
-            process_update_governance_config(program_id, accounts, quorm_threshold, proposal_threshold, voting_period, time_lock_delay, execution_threshold)
+            process_update_governance_config(
+                program_id,
+                accounts,
+                quorum_threshold,
+                proposal_threshold,
+                voting_period,
+                time_lock_delay,
+                execution_threshold,
+            )
         }
     }
 }
@@ -205,10 +281,8 @@ fn process_initialize(program_id: &Pubkey, accounts: &[AccountInfo], bump: u8) -
     }
 
     // Verify PDA derivation
-    let expected_vault_pda = Pubkey::create_program_address(
-        &[b"vault", authority.key.as_ref(), &[bump]],
-        program_id,
-    )?;
+    let expected_vault_pda =
+        Pubkey::create_program_address(&[b"vault", authority.key.as_ref(), &[bump]], program_id)?;
 
     if expected_vault_pda != *vault_account.key {
         return Err(VaultError::InvalidAccountData.into());
@@ -234,7 +308,11 @@ fn process_initialize(program_id: &Pubkey, accounts: &[AccountInfo], bump: u8) -
 
         invoke_signed(
             &transfer_ix,
-            &[authority.clone(), vault_account.clone(), system_program.clone()],
+            &[
+                authority.clone(),
+                vault_account.clone(),
+                system_program.clone(),
+            ],
             &[],
         )?;
     }
@@ -275,13 +353,21 @@ fn process_initialize(program_id: &Pubkey, accounts: &[AccountInfo], bump: u8) -
 
     // Emit initialization event
     let init_event = VaultInitializedEvent {
-        base: create_base_event(*vault_account.key, *authority.key, "vault_initialized", &clock),
+        base: create_base_event(
+            *vault_account.key,
+            *authority.key,
+            "vault_initialized",
+            &clock,
+        ),
         bump,
         emergency_admin: *emergency_admin.key,
     };
     emit_event!(init_event, init_event);
 
-    msg!("Vault initialized successfully with PDA: {}", vault_account.key);
+    msg!(
+        "Vault initialized successfully with PDA: {}",
+        vault_account.key
+    );
     msg!("Authority: {}", authority.key);
     msg!("Emergency Admin: {}", emergency_admin.key);
 
@@ -325,7 +411,10 @@ fn process_deposit(program_id: &Pubkey, accounts: &[AccountInfo], amount: u64) -
     let token_mint = user_token.mint;
 
     // Check if token is supported
-    let supported_token = vault.supported_tokens.iter().find(|t| t.mint == token_mint && t.is_active);
+    let supported_token = vault
+        .supported_tokens
+        .iter()
+        .find(|t| t.mint == token_mint && t.is_active);
     if supported_token.is_none() {
         return Err(VaultError::InvalidAccountData.into());
     }
@@ -368,12 +457,19 @@ fn process_deposit(program_id: &Pubkey, accounts: &[AccountInfo], amount: u64) -
     let clock = Clock::from_account_info(clock_sysvar)?;
 
     // Update supported token totals
-    if let Some(supported_token) = vault.supported_tokens.iter_mut().find(|t| t.mint == token_mint) {
+    if let Some(supported_token) = vault
+        .supported_tokens
+        .iter_mut()
+        .find(|t| t.mint == token_mint)
+    {
         supported_token.total_deposited += net_deposit_amount;
     }
 
     // Update token balance
-    let balance_index = vault.token_balances.iter().position(|b| b.mint == token_mint);
+    let balance_index = vault
+        .token_balances
+        .iter()
+        .position(|b| b.mint == token_mint);
     if let Some(index) = balance_index {
         vault.token_balances[index].balance += net_deposit_amount;
         vault.token_balances[index].last_updated = clock.unix_timestamp;
@@ -395,7 +491,12 @@ fn process_deposit(program_id: &Pubkey, accounts: &[AccountInfo], amount: u64) -
 
     // Emit deposit event
     let deposit_event = TokenDepositedEvent {
-        base: create_base_event(*vault_account.key, *user_authority.key, "token_deposited", &clock),
+        base: create_base_event(
+            *vault_account.key,
+            *user_authority.key,
+            "token_deposited",
+            &clock,
+        ),
         token_mint,
         amount: net_deposit_amount,
         fee_amount: deposit_fee,
@@ -403,7 +504,11 @@ fn process_deposit(program_id: &Pubkey, accounts: &[AccountInfo], amount: u64) -
     };
     emit_event!(deposit_event, deposit_event);
 
-    msg!("Successfully deposited {} tokens (fee: {}) to vault", net_deposit_amount, deposit_fee);
+    msg!(
+        "Successfully deposited {} tokens (fee: {}) to vault",
+        net_deposit_amount,
+        deposit_fee
+    );
     msg!("Token mint: {}", token_mint);
     msg!("Depositor: {}", user_authority.key);
 
@@ -447,7 +552,10 @@ fn process_withdraw(program_id: &Pubkey, accounts: &[AccountInfo], amount: u64) 
     let token_mint = vault_token.mint;
 
     // Check if token is supported
-    let supported_token = vault.supported_tokens.iter().find(|t| t.mint == token_mint && t.is_active);
+    let supported_token = vault
+        .supported_tokens
+        .iter()
+        .find(|t| t.mint == token_mint && t.is_active);
     if supported_token.is_none() {
         return Err(VaultError::InvalidAccountData.into());
     }
@@ -459,7 +567,10 @@ fn process_withdraw(program_id: &Pubkey, accounts: &[AccountInfo], amount: u64) 
     }
 
     // Check vault balance
-    let vault_balance = vault.token_balances.iter().find(|b| b.mint == token_mint)
+    let vault_balance = vault
+        .token_balances
+        .iter()
+        .find(|b| b.mint == token_mint)
         .map(|b| b.balance)
         .unwrap_or(0);
 
@@ -502,12 +613,20 @@ fn process_withdraw(program_id: &Pubkey, accounts: &[AccountInfo], amount: u64) 
     let clock = Clock::from_account_info(clock_sysvar)?;
 
     // Update supported token totals
-    if let Some(supported_token) = vault.supported_tokens.iter_mut().find(|t| t.mint == token_mint) {
+    if let Some(supported_token) = vault
+        .supported_tokens
+        .iter_mut()
+        .find(|t| t.mint == token_mint)
+    {
         supported_token.total_withdrawn += net_withdrawal_amount;
     }
 
     // Update token balance
-    if let Some(balance) = vault.token_balances.iter_mut().find(|b| b.mint == token_mint) {
+    if let Some(balance) = vault
+        .token_balances
+        .iter_mut()
+        .find(|b| b.mint == token_mint)
+    {
         balance.balance -= net_withdrawal_amount;
         balance.last_updated = clock.unix_timestamp;
     }
@@ -522,7 +641,12 @@ fn process_withdraw(program_id: &Pubkey, accounts: &[AccountInfo], amount: u64) 
 
     // Emit withdrawal event
     let withdrawal_event = TokenWithdrawnEvent {
-        base: create_base_event(*vault_account.key, *user_authority.key, "token_withdrawn", &clock),
+        base: create_base_event(
+            *vault_account.key,
+            *user_authority.key,
+            "token_withdrawn",
+            &clock,
+        ),
         token_mint,
         amount: net_withdrawal_amount,
         fee_amount: withdrawal_fee,
@@ -530,15 +654,28 @@ fn process_withdraw(program_id: &Pubkey, accounts: &[AccountInfo], amount: u64) 
     };
     emit_event!(withdrawal_event, withdrawal_event);
 
-    msg!("Successfully withdrew {} tokens (fee: {}) from vault", net_withdrawal_amount, withdrawal_fee);
+    msg!(
+        "Successfully withdrew {} tokens (fee: {}) from vault",
+        net_withdrawal_amount,
+        withdrawal_fee
+    );
     msg!("Token mint: {}", token_mint);
     msg!("Recipient: {}", user_authority.key);
 
     Ok(())
 }
 
-fn process_transfer(program_id: &Pubkey, accounts: &[AccountInfo], recipient: Pubkey, amount: u64) -> ProgramResult {
-    msg!("Processing transfer of {} lamports to {}", amount, recipient);
+fn process_transfer(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    recipient: Pubkey,
+    amount: u64,
+) -> ProgramResult {
+    msg!(
+        "Processing transfer of {} lamports to {}",
+        amount,
+        recipient
+    );
     // TODO: Implement actual transfer logic
     // This would involve:
     // 1. Verify authority
@@ -548,7 +685,13 @@ fn process_transfer(program_id: &Pubkey, accounts: &[AccountInfo], recipient: Pu
     Ok(())
 }
 
-fn process_initialize_multi_sig(program_id: &Pubkey, accounts: &[AccountInfo], owners: Vec<Pubkey>, threshold: u64, nonce: u8) -> ProgramResult {
+fn process_initialize_multi_sig(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    owners: Vec<Pubkey>,
+    threshold: u64,
+    nonce: u8,
+) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let vault_account = next_account_info(account_info_iter)?;
     let initializer = next_account_info(account_info_iter)?;
@@ -596,33 +739,58 @@ fn process_initialize_multi_sig(program_id: &Pubkey, accounts: &[AccountInfo], o
 
     // Emit event
     let multisig_event = MultiSigInitializedEvent {
-        base: create_base_event(*vault_account.key, *initializer.key, "multisig_initialized", &clock),
+        base: create_base_event(
+            *vault_account.key,
+            *initializer.key,
+            "multisig_initialized",
+            &clock,
+        ),
         owners,
         threshold,
         nonce,
     };
     emit_event!(multisig_event, multisig_event);
 
-    msg!("Multi-signature initialized with {} owners and threshold {}", unique_owners.len(), threshold);
+    msg!(
+        "Multi-signature initialized with {} owners and threshold {}",
+        unique_owners.len(),
+        threshold
+    );
     Ok(())
 }
 
-fn process_create_proposal(program_id: &Pubkey, accounts: &[AccountInfo], instruction: VaultInstruction) -> ProgramResult {
+fn process_create_proposal(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    instruction_data: Vec<u8>,
+) -> ProgramResult {
     msg!("Processing create proposal");
     Ok(())
 }
 
-fn process_approve_proposal(program_id: &Pubkey, accounts: &[AccountInfo], proposal_id: u64) -> ProgramResult {
+fn process_approve_proposal(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    proposal_id: u64,
+) -> ProgramResult {
     msg!("Processing approve proposal: {}", proposal_id);
     Ok(())
 }
 
-fn process_execute_proposal(program_id: &Pubkey, accounts: &[AccountInfo], proposal_id: u64) -> ProgramResult {
+fn process_execute_proposal(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    proposal_id: u64,
+) -> ProgramResult {
     msg!("Processing execute proposal: {}", proposal_id);
     Ok(())
 }
 
-fn process_reject_proposal(program_id: &Pubkey, accounts: &[AccountInfo], proposal_id: u64) -> ProgramResult {
+fn process_reject_proposal(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    proposal_id: u64,
+) -> ProgramResult {
     msg!("Processing reject proposal: {}", proposal_id);
     Ok(())
 }
@@ -637,12 +805,22 @@ fn process_unpause_vault(program_id: &Pubkey, accounts: &[AccountInfo]) -> Progr
     Ok(())
 }
 
-fn process_emergency_withdraw(program_id: &Pubkey, accounts: &[AccountInfo], token_mint: Pubkey, amount: u64) -> ProgramResult {
+fn process_emergency_withdraw(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    token_mint: Pubkey,
+    amount: u64,
+) -> ProgramResult {
     msg!("Processing emergency withdraw");
     Ok(())
 }
 
-fn process_add_supported_token(program_id: &Pubkey, accounts: &[AccountInfo], mint: Pubkey, bump: u8) -> ProgramResult {
+fn process_add_supported_token(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    mint: Pubkey,
+    bump: u8,
+) -> ProgramResult {
     let account_info_iter = &mut accounts.iter();
     let vault_account = next_account_info(account_info_iter)?;
     let vault_token_account = next_account_info(account_info_iter)?;
@@ -741,47 +919,94 @@ fn process_add_supported_token(program_id: &Pubkey, accounts: &[AccountInfo], mi
     Ok(())
 }
 
-fn process_deposit_multi_token(program_id: &Pubkey, accounts: &[AccountInfo], mint: Pubkey, amount: u64) -> ProgramResult {
+fn process_deposit_multi_token(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    mint: Pubkey,
+    amount: u64,
+) -> ProgramResult {
     msg!("Processing deposit multi token");
     Ok(())
 }
 
-fn process_create_time_lock(program_id: &Pubkey, accounts: &[AccountInfo], beneficiary: Pubkey, amount: u64, duration: i64, cliff_duration: Option<i64>, is_linear: bool) -> ProgramResult {
+fn process_create_time_lock(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    beneficiary: Pubkey,
+    amount: u64,
+    duration: i64,
+    cliff_duration: Option<i64>,
+    is_linear: bool,
+) -> ProgramResult {
     msg!("Processing create time lock");
     Ok(())
 }
 
-fn process_claim_time_lock(program_id: &Pubkey, accounts: &[AccountInfo], time_lock_index: usize) -> ProgramResult {
+fn process_claim_time_lock(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    time_lock_index: usize,
+) -> ProgramResult {
     msg!("Processing claim time lock");
     Ok(())
 }
 
-fn process_cancel_time_lock(program_id: &Pubkey, accounts: &[AccountInfo], time_lock_index: usize) -> ProgramResult {
+fn process_cancel_time_lock(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    time_lock_index: usize,
+) -> ProgramResult {
     msg!("Processing cancel time lock");
     Ok(())
 }
 
-fn process_set_yield_strategy(program_id: &Pubkey, accounts: &[AccountInfo], token_mint: Pubkey, strategy_program: Pubkey) -> ProgramResult {
+fn process_set_yield_strategy(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    token_mint: Pubkey,
+    strategy_program: Pubkey,
+) -> ProgramResult {
     msg!("Processing set yield strategy");
     Ok(())
 }
 
-fn process_harvest_yield(program_id: &Pubkey, accounts: &[AccountInfo], token_mint: Pubkey) -> ProgramResult {
+fn process_harvest_yield(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    token_mint: Pubkey,
+) -> ProgramResult {
     msg!("Processing harvest yield");
     Ok(())
 }
 
-fn process_compound_yield(program_id: &Pubkey, accounts: &[AccountInfo], token_mint: Pubkey) -> ProgramResult {
+fn process_compound_yield(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    token_mint: Pubkey,
+) -> ProgramResult {
     msg!("Processing compound yield");
     Ok(())
 }
 
-fn process_jupiter_swap(program_id: &Pubkey, accounts: &[AccountInfo], input_mint: Pubkey, output_mint: Pubkey, amount: u64) -> ProgramResult {
+fn process_jupiter_swap(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    input_mint: Pubkey,
+    output_mint: Pubkey,
+    amount: u64,
+) -> ProgramResult {
     msg!("Processing jupiter swap");
     Ok(())
 }
 
-fn process_jupiter_route(program_id: &Pubkey, accounts: &[AccountInfo], input_mint: Pubkey, output_mint: Pubkey, amount: u64, route: Vec<u8>) -> ProgramResult {
+fn process_jupiter_route(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    input_mint: Pubkey,
+    output_mint: Pubkey,
+    amount: u64,
+    route: Vec<u8>,
+) -> ProgramResult {
     msg!("Processing jupiter route");
     Ok(())
 }
@@ -791,42 +1016,86 @@ fn process_collect_fees(program_id: &Pubkey, accounts: &[AccountInfo]) -> Progra
     Ok(())
 }
 
-fn process_transfer_authority(program_id: &Pubkey, accounts: &[AccountInfo], new_authority: Pubkey) -> ProgramResult {
+fn process_transfer_authority(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    new_authority: Pubkey,
+) -> ProgramResult {
     msg!("Processing transfer authority");
     Ok(())
 }
 
-fn process_update_emergency_admin(program_id: &Pubkey, accounts: &[AccountInfo], new_admin: Pubkey) -> ProgramResult {
+fn process_update_emergency_admin(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    new_admin: Pubkey,
+) -> ProgramResult {
     msg!("Processing update emergency admin");
     Ok(())
 }
 
-fn process_initialize_governance(program_id: &Pubkey, accounts: &[AccountInfo], voting_token_mint: Pubkey, quorm_threshold: u16, proposal_threshold: u64, voting_period: i64, time_lock_delay: i64, execution_threshold: u16) -> ProgramResult {
+fn process_initialize_governance(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    voting_token_mint: Pubkey,
+    quorum_threshold: u16,
+    proposal_threshold: u64,
+    voting_period: i64,
+    time_lock_delay: i64,
+    execution_threshold: u16,
+) -> ProgramResult {
     msg!("Processing initialize governance");
     Ok(())
 }
 
-fn process_create_governance_proposal(program_id: &Pubkey, accounts: &[AccountInfo], title: String, description: String, instructions: Vec<Vec<u8>>) -> ProgramResult {
+fn process_create_governance_proposal(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    title: String,
+    description: String,
+    instructions: Vec<Vec<u8>>,
+) -> ProgramResult {
     msg!("Processing create governance proposal");
     Ok(())
 }
 
-fn process_cast_vote(program_id: &Pubkey, accounts: &[AccountInfo], proposal_id: u64, vote_type: crate::state::VoteType) -> ProgramResult {
+fn process_cast_vote(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    proposal_id: u64,
+    vote_type: crate::state::VoteType,
+) -> ProgramResult {
     msg!("Processing cast vote");
     Ok(())
 }
 
-fn process_queue_proposal(program_id: &Pubkey, accounts: &[AccountInfo], proposal_id: u64) -> ProgramResult {
+fn process_queue_proposal(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    proposal_id: u64,
+) -> ProgramResult {
     msg!("Processing queue proposal");
     Ok(())
 }
 
-fn process_execute_governance_proposal(program_id: &Pubkey, accounts: &[AccountInfo], proposal_id: u64) -> ProgramResult {
+fn process_execute_governance_proposal(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    proposal_id: u64,
+) -> ProgramResult {
     msg!("Processing execute governance proposal");
     Ok(())
 }
 
-fn process_update_governance_config(program_id: &Pubkey, accounts: &[AccountInfo], quorm_threshold: u16, proposal_threshold: u64, voting_period: i64, time_lock_delay: i64, execution_threshold: u16) -> ProgramResult {
+fn process_update_governance_config(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    quorum_threshold: u16,
+    proposal_threshold: u64,
+    voting_period: i64,
+    time_lock_delay: i64,
+    execution_threshold: u16,
+) -> ProgramResult {
     msg!("Processing update governance config");
     Ok(())
 }
@@ -852,7 +1121,10 @@ fn process_create_multi_sig_transaction(
     let mut vault = Vault::try_from_slice(&vault_data)?;
 
     // Check if multisig is initialized
-    let multi_sig = vault.multi_sig.as_ref().ok_or(VaultError::MultisigNotInitialized)?;
+    let multi_sig = vault
+        .multi_sig
+        .as_ref()
+        .ok_or(VaultError::MultisigNotInitialized)?;
 
     // Check if proposer is authorized
     if !multi_sig.owners.contains(proposer.key) {
@@ -863,7 +1135,10 @@ fn process_create_multi_sig_transaction(
     let transaction_id = vault.multi_sig_transactions.len() as u64;
 
     // Find owner index
-    let owner_index = multi_sig.owners.iter().position(|owner| owner == proposer.key)
+    let owner_index = multi_sig
+        .owners
+        .iter()
+        .position(|owner| owner == proposer.key)
         .ok_or(VaultError::InvalidOwner)?;
 
     let mut signers = vec![false; multi_sig.owners.len()];
@@ -892,7 +1167,12 @@ fn process_create_multi_sig_transaction(
 
     // Emit event
     let transaction_event = MultiSigTransactionCreatedEvent {
-        base: create_base_event(*vault_account.key, *proposer.key, "multisig_transaction_created", &clock),
+        base: create_base_event(
+            *vault_account.key,
+            *proposer.key,
+            "multisig_transaction_created",
+            &clock,
+        ),
         transaction_id,
         proposer: *proposer.key,
         target_program: target_program_id,
@@ -900,7 +1180,11 @@ fn process_create_multi_sig_transaction(
     };
     emit_event!(transaction_event, transaction_event);
 
-    msg!("Multi-sig transaction {} created by {}", transaction_id, proposer.key);
+    msg!(
+        "Multi-sig transaction {} created by {}",
+        transaction_id,
+        proposer.key
+    );
     Ok(())
 }
 
@@ -922,7 +1206,10 @@ fn process_approve_multi_sig_transaction(
     let mut vault = Vault::try_from_slice(&vault_data)?;
 
     // Check if multisig is initialized
-    let multi_sig = vault.multi_sig.as_ref().ok_or(VaultError::MultisigNotInitialized)?;
+    let multi_sig = vault
+        .multi_sig
+        .as_ref()
+        .ok_or(VaultError::MultisigNotInitialized)?;
 
     // Check if transaction exists
     if transaction_id as usize >= vault.multi_sig_transactions.len() {
@@ -937,7 +1224,10 @@ fn process_approve_multi_sig_transaction(
     }
 
     // Find approver in owners list
-    let owner_index = multi_sig.owners.iter().position(|owner| owner == approver.key)
+    let owner_index = multi_sig
+        .owners
+        .iter()
+        .position(|owner| owner == approver.key)
         .ok_or(VaultError::InvalidOwner)?;
 
     // Check if already approved
@@ -956,7 +1246,12 @@ fn process_approve_multi_sig_transaction(
 
     // Emit event
     let approval_event = MultiSigTransactionApprovedEvent {
-        base: create_base_event(*vault_account.key, *approver.key, "multisig_transaction_approved", &clock),
+        base: create_base_event(
+            *vault_account.key,
+            *approver.key,
+            "multisig_transaction_approved",
+            &clock,
+        ),
         transaction_id,
         approver: *approver.key,
         current_approvals,
@@ -964,7 +1259,13 @@ fn process_approve_multi_sig_transaction(
     };
     emit_event!(approval_event, approval_event);
 
-    msg!("Multi-sig transaction {} approved by {} ({} of {} approvals)", transaction_id, approver.key, current_approvals, multi_sig.threshold);
+    msg!(
+        "Multi-sig transaction {} approved by {} ({} of {} approvals)",
+        transaction_id,
+        approver.key,
+        current_approvals,
+        multi_sig.threshold
+    );
     Ok(())
 }
 
@@ -987,7 +1288,10 @@ fn process_execute_multi_sig_transaction(
     let mut vault = Vault::try_from_slice(&vault_data)?;
 
     // Check if multisig is initialized
-    let multi_sig = vault.multi_sig.as_ref().ok_or(VaultError::MultisigNotInitialized)?;
+    let multi_sig = vault
+        .multi_sig
+        .as_ref()
+        .ok_or(VaultError::MultisigNotInitialized)?;
 
     // Check if transaction exists
     if transaction_id as usize >= vault.multi_sig_transactions.len() {
@@ -1010,15 +1314,19 @@ fn process_execute_multi_sig_transaction(
     // Create the instruction to execute
     let mut ix = Instruction {
         program_id: transaction.program_id,
-        accounts: transaction.accounts.iter().map(|acc| {
-            if &acc.pubkey == multisig_signer.key {
-                AccountMeta::new_readonly(acc.pubkey, true)
-            } else if acc.is_writable {
-                AccountMeta::new(acc.pubkey, acc.is_signer)
-            } else {
-                AccountMeta::new_readonly(acc.pubkey, acc.is_signer)
-            }
-        }).collect(),
+        accounts: transaction
+            .accounts
+            .iter()
+            .map(|acc| {
+                if &acc.pubkey == multisig_signer.key {
+                    AccountMeta::new_readonly(acc.pubkey, true)
+                } else if acc.is_writable {
+                    AccountMeta::new(acc.pubkey, acc.is_signer)
+                } else {
+                    AccountMeta::new_readonly(acc.pubkey, acc.is_signer)
+                }
+            })
+            .collect(),
         data: transaction.data.clone(),
     };
 
@@ -1035,10 +1343,7 @@ fn process_execute_multi_sig_transaction(
         return Err(VaultError::InvalidAccountData.into());
     }
 
-    let seeds = &[
-        vault_account.key.as_ref(),
-        &[bump],
-    ];
+    let seeds = &[vault_account.key.as_ref(), &[bump]];
     let signer_seeds = &[&seeds[..]];
 
     // Execute the transaction
@@ -1054,14 +1359,23 @@ fn process_execute_multi_sig_transaction(
 
     // Emit event
     let execution_event = MultiSigTransactionExecutedEvent {
-        base: create_base_event(*vault_account.key, *executor.key, "multisig_transaction_executed", &clock),
+        base: create_base_event(
+            *vault_account.key,
+            *executor.key,
+            "multisig_transaction_executed",
+            &clock,
+        ),
         transaction_id,
         executor: *executor.key,
         target_program: transaction.program_id,
     };
     emit_event!(execution_event, execution_event);
 
-    msg!("Multi-sig transaction {} executed by {}", transaction_id, executor.key);
+    msg!(
+        "Multi-sig transaction {} executed by {}",
+        transaction_id,
+        executor.key
+    );
     Ok(())
 }
 
@@ -1083,7 +1397,10 @@ fn process_set_multi_sig_owners(
     let vault_data = vault_account.data.borrow();
     let mut vault = Vault::try_from_slice(&vault_data)?;
 
-    let multi_sig = vault.multi_sig.as_mut().ok_or(VaultError::MultisigNotInitialized)?;
+    let multi_sig = vault
+        .multi_sig
+        .as_mut()
+        .ok_or(VaultError::MultisigNotInitialized)?;
 
     // Validate new owners (no duplicates)
     let mut unique_owners = owners.clone();
@@ -1110,13 +1427,22 @@ fn process_set_multi_sig_owners(
 
     // Emit event
     let owners_event = MultiSigOwnersUpdatedEvent {
-        base: create_base_event(*vault_account.key, *authority.key, "multisig_owners_updated", &clock),
+        base: create_base_event(
+            *vault_account.key,
+            *authority.key,
+            "multisig_owners_updated",
+            &clock,
+        ),
         old_owners: old_owners.clone(),
         new_owners: owners.clone(),
     };
     emit_event!(owners_event, owners_event);
 
-    msg!("Multi-sig owners updated from {:?} to {:?}", old_owners, owners);
+    msg!(
+        "Multi-sig owners updated from {:?} to {:?}",
+        old_owners,
+        owners
+    );
     Ok(())
 }
 
@@ -1138,7 +1464,10 @@ fn process_change_multi_sig_threshold(
     let vault_data = vault_account.data.borrow();
     let mut vault = Vault::try_from_slice(&vault_data)?;
 
-    let multi_sig = vault.multi_sig.as_mut().ok_or(VaultError::MultisigNotInitialized)?;
+    let multi_sig = vault
+        .multi_sig
+        .as_mut()
+        .ok_or(VaultError::MultisigNotInitialized)?;
 
     // Validate threshold
     if threshold == 0 || threshold > multi_sig.owners.len() as u64 {
@@ -1157,13 +1486,22 @@ fn process_change_multi_sig_threshold(
 
     // Emit event
     let threshold_event = MultiSigThresholdUpdatedEvent {
-        base: create_base_event(*vault_account.key, *authority.key, "multisig_threshold_updated", &clock),
+        base: create_base_event(
+            *vault_account.key,
+            *authority.key,
+            "multisig_threshold_updated",
+            &clock,
+        ),
         old_threshold,
         new_threshold: threshold,
     };
     emit_event!(threshold_event, threshold_event);
 
-    msg!("Multi-sig threshold changed from {} to {}", old_threshold, threshold);
+    msg!(
+        "Multi-sig threshold changed from {} to {}",
+        old_threshold,
+        threshold
+    );
     Ok(())
 }
 
@@ -1183,7 +1521,9 @@ fn validate_emergency_admin(vault: &Vault, admin: &Pubkey) -> Result<(), VaultEr
 }
 
 fn validate_token_supported(vault: &Vault, token_mint: &Pubkey) -> Result<(), VaultError> {
-    let supported = vault.supported_tokens.iter()
+    let supported = vault
+        .supported_tokens
+        .iter()
         .any(|t| t.mint == *token_mint && t.is_active);
 
     if !supported {
@@ -1192,8 +1532,14 @@ fn validate_token_supported(vault: &Vault, token_mint: &Pubkey) -> Result<(), Va
     Ok(())
 }
 
-fn validate_vault_balance(vault: &Vault, token_mint: &Pubkey, required_amount: u64) -> Result<(), VaultError> {
-    let balance = vault.token_balances.iter()
+fn validate_vault_balance(
+    vault: &Vault,
+    token_mint: &Pubkey,
+    required_amount: u64,
+) -> Result<(), VaultError> {
+    let balance = vault
+        .token_balances
+        .iter()
         .find(|b| b.mint == *token_mint)
         .map(|b| b.balance)
         .unwrap_or(0);
@@ -1212,7 +1558,10 @@ fn calculate_fee(amount: u64, fee_bps: u16) -> u64 {
 }
 
 fn update_token_balance(vault: &mut Vault, token_mint: &Pubkey, amount_change: i64, clock: &Clock) {
-    let balance_index = vault.token_balances.iter().position(|b| b.mint == *token_mint);
+    let balance_index = vault
+        .token_balances
+        .iter()
+        .position(|b| b.mint == *token_mint);
 
     if let Some(index) = balance_index {
         let balance = &mut vault.token_balances[index];
@@ -1227,8 +1576,17 @@ fn update_token_balance(vault: &mut Vault, token_mint: &Pubkey, amount_change: i
     }
 }
 
-fn update_supported_token_totals(vault: &mut Vault, token_mint: &Pubkey, deposited: u64, withdrawn: u64) {
-    if let Some(supported_token) = vault.supported_tokens.iter_mut().find(|t| t.mint == *token_mint) {
+fn update_supported_token_totals(
+    vault: &mut Vault,
+    token_mint: &Pubkey,
+    deposited: u64,
+    withdrawn: u64,
+) {
+    if let Some(supported_token) = vault
+        .supported_tokens
+        .iter_mut()
+        .find(|t| t.mint == *token_mint)
+    {
         supported_token.total_deposited += deposited;
         supported_token.total_withdrawn += withdrawn;
     }

@@ -237,7 +237,12 @@ pub struct GovernanceProposalCancelledEvent {
     pub proposal_id: u64,
 }
 
-pub fn create_base_event(vault: Pubkey, authority: Pubkey, event_type: &str, clock: &Clock) -> VaultEvent {
+pub fn create_base_event(
+    vault: Pubkey,
+    authority: Pubkey,
+    event_type: &str,
+    clock: &Clock,
+) -> VaultEvent {
     VaultEvent {
         event_type: event_type.to_string(),
         vault,
@@ -245,4 +250,3 @@ pub fn create_base_event(vault: Pubkey, authority: Pubkey, event_type: &str, clo
         authority,
     }
 }
-
