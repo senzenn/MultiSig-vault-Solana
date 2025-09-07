@@ -26,3 +26,6 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.bak
+
+# Frontend app
+vault-frontend/
